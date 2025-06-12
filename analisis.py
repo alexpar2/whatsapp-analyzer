@@ -7,6 +7,7 @@ import pandas as pd
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+import unicodedata
 
 try:
     nltk.data.find('corpora/stopwords')
@@ -87,19 +88,32 @@ def obtener_palabras_frecuentes(mensajes_usuario, num_top=10):
     return Counter(all_words).most_common(num_top)
 
 
+
 def analizar_menciones(mensajes_usuario, todos_los_usuarios_set):
     """
-    Cuenta las menciones a otros usuarios en los mensajes de un usuario.
-    La lógica de 'word boundary' (\b) ayuda a evitar subcadenas.
+    Cuenta las menciones a otros usuarios en los mensajes de un usuario,
+    ignorando mayúsculas y tildes.
     """
     menciones_contador = Counter()
+
+    # Quitar tildes y pasar a minúsculas para todos los nombres de usuario
+    usuarios_normalizados = {
+        ''.join(c for c in unicodedata.normalize('NFD', u.lower()) if unicodedata.category(c) != 'Mn'): u
+        for u in todos_los_usuarios_set if len(u) > 2
+    }
+
     for msg in mensajes_usuario:
-        msg_lower = msg.lower()
-        for usuario_mencionado in todos_los_usuarios_set:
-            usuario_mencionado_lower = usuario_mencionado.lower()
-            if len(usuario_mencionado_lower) > 2 and re.search(r'\b' + re.escape(usuario_mencionado_lower) + r'\b', msg_lower):
-                menciones_contador[usuario_mencionado] += 1
+        # Normalizar el mensaje (sin tildes y en minúsculas)
+        msg_normalizado = ''.join(
+            c for c in unicodedata.normalize('NFD', msg.lower()) if unicodedata.category(c) != 'Mn'
+        )
+
+        for nombre_normalizado, nombre_original in usuarios_normalizados.items():
+            if re.search(r'\b' + re.escape(nombre_normalizado) + r'\b', msg_normalizado):
+                menciones_contador[nombre_original] += 1
+
     return menciones_contador
+
 
 
 # --- Función principal de análisis (modificada) ---
