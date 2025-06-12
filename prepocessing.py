@@ -23,21 +23,20 @@ SISTEMA_PATRONES = [
 META_AI_PATRON = re.compile(r"^Meta AI$")
 CONTACTO_NO_AÑADIDO_PATRON = re.compile(r"^\+\d[\d\s]+")
 
-NICKNAME_MAPPING = {
-    "Galletita Ginger": "Pablo",
-    "Davidinchi": "David",
-    "Joseja": "JJ",
-    "Alba Malbada😈": "Alba",
-    "Alii": "Alicia",
-    "Anaaa": "Ana",
-    "ElQuique🦍": "Quique",
-    "ElNachos": "Nacho",
-    "Elena S": "Elena",
-    "Ivanosaurio": "Iván",
-    "Miri": "Miriam",
-    "Jose G": "Jose",
-    "~𝙷𝚎𝚕𝚎𝚗 ❀": "Helen"
-}
+def cargar_nickname_mapping(ruta_archivo):
+    mapping = {}
+    if not os.path.exists(ruta_archivo):
+        print(f"⚠️ Archivo de apodos no encontrado: {ruta_archivo}. Se usará el nombre original sin cambiar.")
+        return mapping
+    with open(ruta_archivo, encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            original = row["original"].strip()
+            nombre = row["nombre"].strip()
+            if original and nombre:
+                mapping[original] = nombre
+    return mapping
+
 
 def es_mensaje_de_sistema(texto):
     texto = texto.replace('‎', '')
@@ -68,7 +67,7 @@ def limpiar_csv_de_nuls(input_path):
     os.replace(temp_path, input_path)
     print(f"🧹 Limpieza de caracteres NUL completada: {input_path}")
 
-def preprocesar_chat(input_path, output_path):
+def preprocesar_chat(input_path, output_path, nickname_mapping):
     mensajes = []
     line_num = 0
     with open(input_path, "r", encoding="utf-8") as f:
@@ -84,8 +83,8 @@ def preprocesar_chat(input_path, output_path):
                 if es_contacto_no_añadido(autor) or es_mensaje_de_meta_ai(autor) or es_mensaje_de_sistema(texto):
                     continue
 
-                if autor in NICKNAME_MAPPING:
-                    autor = NICKNAME_MAPPING[autor]
+                if autor in nickname_mapping:
+                    autor = nickname_mapping[autor]
 
                 fecha_normalizada = normalizar_fecha(fecha, hora)
                 if fecha_normalizada:
@@ -108,9 +107,12 @@ def main():
     parser = argparse.ArgumentParser(description="Preprocesador de chats de WhatsApp (salida en CSV).")
     parser.add_argument("input_file", help="Ruta al archivo .txt original exportado de WhatsApp")
     parser.add_argument("output_file", help="Ruta al archivo de salida .csv")
+    parser.add_argument("--nicks", default="nickname_mapping.csv", help="Archivo CSV con apodos y nombres reales")
     args = parser.parse_args()
 
-    preprocesar_chat(args.input_file, args.output_file)
+    nickname_mapping = cargar_nickname_mapping(args.nicks)
+
+    preprocesar_chat(args.input_file, args.output_file, nickname_mapping)
 
 if __name__ == "__main__":
     main()

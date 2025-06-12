@@ -17,8 +17,9 @@ HOW TO EXPORT A WHATSAPP CHAT
 STEPS:
 1. Move to the directory where the scripts are
 2. Install requirements (python3 -m pip install -r requirements.txt)
-3. Execute run_pipeline.sh with your chat as an argument.If your chat is individual, then put -i as an initial argument, so that mention statistics are not created (could lead to error)
-4. Open result (will be in Exports_whatsapp) with a browser and enjoy the graphs.
+3. Personalize your nickname_mapping.csv file for more precise results
+4. Execute run_pipeline.sh with your chat as an argument.If your chat is individual, then put -i as an initial argument, so that mention statistics are not created (could lead to error)
+5. Open result (will be in Exports_whatsapp) with a browser and enjoy the graphs.
 
 If you're crazy enough to try this without bash, look at the run_pipeline.sh script and try to follow the steps there.
 
@@ -27,10 +28,10 @@ The mentions statistics work with the contact names. IF your contact name isn't 
 go to the preprocessing script, and add to the nickname mapping your "translation".
 In the line graphs, especially the normalized ones, remove the outliers (people who have chatted very little) for less noisy data.
 You can do so by clicking on their name in the interactive graph.
+Nickname mapping: A simple csv with the columns: original,nombre. Under original, you write the contact name. Under nombre, you write the real name of the person (or how you usually call them.)
 
 TROUBLESHOOTING:
 Most likely the preprocessing messed something up. I will improve it with time and hopefully it will be better with time.
 
 FUTURE IMPROVEMENTS:
-Might add a "individual" argument for the analysis script that leaves out group-only stats such as mentions.
 Might add sentence transformers and sentiment analysis but that will dramatically increase processing time.
