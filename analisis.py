@@ -40,7 +40,7 @@ PALABRAS_A_EXCLUIR = {
     # Añade más palabras que consideres irrelevantes para tus sustantivos principales
     "a", "ante", "bajo", "cabe", "con", "contra", "de", "desde", "durante", "en",
     "entre", "hacia", "hasta", "para", "por", "según", "sin", "so", "sobre", "tras",
-     "voy","pa", "casa", "va", "puedo", "luego", "tarde", "aunq", "pos", "pues", "pablo", "anto", "deivi", "josemi", "david", "jj", "aj", "german", "alex",
+     "voy","pa", "casa", "va", "puedo", "luego", "tarde", "aunq", "pos", "pues",
     "pues", "porque", "aunque", "pero", "sino", "ya que", "como", "cuando",
     "vamos", "creo", "verdad", "hora", "puede"
 }

@@ -417,12 +417,43 @@ def grafica_linea_mensajes_por_mes_del_anyo_normalizado(df_mes, df_usuario):
     return fig
 
 
+def grafica_heatmap_menciones(df_menciones_por_autor):
+    """
+    Heatmap de la frecuencia de menciones entre usuarios.
+    Requiere un DataFrame con columnas 'autor_mencionador', 'usuario_mencionado', 'conteo'.
+    """
+    if df_menciones_por_autor.empty:
+        fig = go.Figure().update_layout(title="👥 Frecuencia de Menciones entre Usuarios (No hay menciones registradas)")
+        return fig
+
+    # Pivotar el DataFrame para obtener la matriz de menciones
+    mention_matrix = df_menciones_por_autor.pivot_table(
+        index='autor_mencionador',
+        columns='usuario_mencionado',
+        values='conteo'
+    ).fillna(0) # Rellenar NaN con 0 donde no hay menciones
+
+    fig = px.imshow(
+        mention_matrix,
+        labels=dict(x="Usuario Mencionado", y="Autor Mencionador", color="Conteo"),
+        x=mention_matrix.columns.tolist(),
+        y=mention_matrix.index.tolist(),
+        title="👥 Frecuencia de Menciones entre Usuarios (Heatmap)",
+        color_continuous_scale="Viridis" # Escala de color
+    )
+    # Ajustar el tamaño del texto en el heatmap para que sea legible
+    fig.update_xaxes(side="top") # Etiquetas de columnas arriba
+    fig.update_layout(
+        autosize=True,
+        height=max(500, len(mention_matrix.index) * 50), # Ajustar altura dinámicamente
+        width=max(700, len(mention_matrix.columns) * 50), # Ajustar ancho dinámicamente
+    )
+    return fig
 
 
 
 
-
-def grafica_heatmap_menciones(df_menciones_por_autor, df_usuarios):
+def grafica_heatmap_menciones_rel(df_menciones_por_autor, df_usuarios):
     """
     Heatmap de la frecuencia de menciones entre usuarios normalizada por mensajes del autor.
     Requiere:
@@ -693,7 +724,8 @@ def main():
 
     # Añadir condicionalmente las gráficas de menciones
     if not args.ignore_mentions:
-        figs.append(grafica_heatmap_menciones(menciones_por_autor_df, usuarios_df)) # Heatmap, no aplica ordenación de la misma manera
+        figs.append(grafica_heatmap_menciones(menciones_por_autor_df))
+        figs.append(grafica_heatmap_menciones_rel(menciones_por_autor_df, usuarios_df)) # Heatmap, no aplica ordenación de la misma manera
 
     # Lista de secciones HTML personalizadas
     html_sections = []
