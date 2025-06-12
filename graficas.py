@@ -30,14 +30,15 @@ def cargar_datos(usuarios_csv, mensual_csv, horas_csv, menciones_globales_csv, d
     # Asegura que las horas estén ordenadas correctamente como una categoría.
     df_horas['hora'] = pd.Categorical(df_horas['hora'], categories=range(24), ordered=True)
 
-    df_menciones_globales = pd.read_csv(menciones_globales_csv)
+   
 
     df_dia_semana = pd.read_csv(dia_semana_csv)
     # Define el orden de los días de la semana para asegurar que se grafiquen correctamente.
     dias_orden = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
     df_dia_semana['dia_semana'] = pd.Categorical(df_dia_semana['dia_semana'], categories=dias_orden, ordered=True)
 
-    df_menciones_por_autor = pd.read_csv(menciones_por_autor_csv)
+    df_menciones_globales = pd.read_csv(menciones_globales_csv) if menciones_globales_csv else pd.DataFrame()
+    df_menciones_por_autor = pd.read_csv(menciones_por_autor_csv) if menciones_por_autor_csv else pd.DataFrame()
 
     return df_usuarios, df_mensual, df_horas, df_menciones_globales, df_dia_semana, df_menciones_por_autor
 
@@ -655,40 +656,52 @@ def main():
     parser.add_argument("--dia_semana", default="mensajes_por_dia_semana.csv", help="Archivo CSV con estadísticas por día de la semana y usuario.")
     parser.add_argument("--menciones_por_autor", default="menciones_por_autor.csv", help="Archivo CSV de menciones detalladas por autor para heatmap.")
     parser.add_argument("--salida", default="dashboard_whatsapp.html", help="Nombre del archivo HTML de salida para el dashboard.")
+    parser.add_argument("-i", "--ignore-mentions", action="store_true", help="Ignora las estadísticas y gráficas de menciones.")
     args = parser.parse_args()
 
-    # Cargar todos los DataFrames necesarios
-    usuarios_df, mensual_df, horas_df, menciones_globales_df, dia_semana_df, menciones_por_autor_df = cargar_datos(
-        args.usuarios, args.mensual, args.horas, args.menciones_globales, args.dia_semana, args.menciones_por_autor
-    )
+    if args.ignore_mentions:
+        usuarios_df, mensual_df, horas_df, _, dia_semana_df, _ = cargar_datos(
+            args.usuarios, args.mensual, args.horas, None, args.dia_semana, None
+        )
+        menciones_globales_df = pd.DataFrame() # Crear DataFrame vacío si no se carga
+        menciones_por_autor_df = pd.DataFrame() # Crear DataFrame vacío si no se carga
+    else:
+        usuarios_df, mensual_df, horas_df, menciones_globales_df, dia_semana_df, menciones_por_autor_df = cargar_datos(
+            args.usuarios, args.mensual, args.horas, args.menciones_globales, args.dia_semana, args.menciones_por_autor
+        )
 
-    # Lista de figuras de Plotly a incluir en el dashboard
+
     figs = [
         grafica_pie_mensajes(usuarios_df),
         grafica_barras(usuarios_df, "num_mensajes", "💬 Total de mensajes por usuario", "Mensajes", "Usuario"),
         grafica_longitud_promedio(usuarios_df),
-        grafica_emojis_por_mensaje(usuarios_df), # Se ha modificado para ordenar y ser horizontal
-        grafica_enlaces_por_mensaje(usuarios_df), # Se ha modificado para ordenar y ser horizontal
-        grafica_multimedia_por_mensaje(usuarios_df), # Se ha modificado para ordenar y ser horizontal
-        grafica_preguntas_por_mensaje(usuarios_df), # Se ha modificado para ordenar y ser horizontal
+        grafica_emojis_por_mensaje(usuarios_df),
+        grafica_enlaces_por_mensaje(usuarios_df),
+        grafica_multimedia_por_mensaje(usuarios_df),
+        grafica_preguntas_por_mensaje(usuarios_df),
 
         grafica_linea_mensajes_por_mes_agregado(mensual_df),
         grafica_linea_mensajes_por_mes(mensual_df),
         grafica_linea_mensajes_por_mes_normalizado(mensual_df, usuarios_df),
-        grafica_linea_mensajes_por_mes_del_anyo_normalizado(mensual_df, usuarios_df), # Gráfico de líneas por mes del año, normalizado
+        grafica_linea_mensajes_por_mes_del_anyo_normalizado(mensual_df, usuarios_df),
         grafica_mensajes_por_dia_semana(dia_semana_df),
-        grafica_mensajes_por_dia_semana_normalizado(dia_semana_df, usuarios_df), 
+        grafica_mensajes_por_dia_semana_normalizado(dia_semana_df, usuarios_df),
         grafica_linea_mensajes_por_hora(horas_df),
         grafica_linea_mensajes_por_hora_normalizado(horas_df, usuarios_df),
-        grafica_top_hablante_mes(mensual_df), # Este no se ordena por los valores y es un gráfico de barras
-        grafica_heatmap_menciones(menciones_por_autor_df, usuarios_df) # Heatmap, no aplica ordenación de la misma manera
+        grafica_top_hablante_mes(mensual_df),
     ]
+
+    # Añadir condicionalmente las gráficas de menciones
+    if not args.ignore_mentions:
+        figs.append(grafica_heatmap_menciones(menciones_por_autor_df, usuarios_df)) # Heatmap, no aplica ordenación de la misma manera
 
     # Lista de secciones HTML personalizadas
     html_sections = []
     html_sections.append(generar_html_palabras_mas_usadas(usuarios_df))
-    html_sections.append(generar_html_menciones_por_persona(usuarios_df))
-    html_sections.append(generar_html_persona_mas_mencionada_total(menciones_globales_df))
+    # Añadir condicionalmente las secciones HTML de menciones
+    if not args.ignore_mentions:
+        html_sections.append(generar_html_menciones_por_persona(usuarios_df))
+        html_sections.append(generar_html_persona_mas_mencionada_total(menciones_globales_df))
 
     # Guardar el dashboard final
     guardar_dashboard(figs, html_sections, args.salida)

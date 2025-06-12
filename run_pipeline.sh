@@ -1,15 +1,25 @@
 #!/bin/bash
 
 # Script para ejecutar el pipeline de analisis de chats de WhatsApp para múltiples archivos.
-# Uso: ./run_pipeline.sh <ruta_al_archivo_chat1.txt> [<ruta_al_archivo_chat2.txt> ...]
+# Uso: ./run_pipeline.sh [-i] <ruta_al_archivo_chat1.txt> [<ruta_al_archivo_chat2.txt> ...]
 
 # Directorio para almacenar los resultados (archivos HTML finales)
 OUTPUT_DIR="whatsapp_results2"
 mkdir -p "$OUTPUT_DIR"
 
+# Variable para controlar si se pasa el argumento -i a graficas.py
+INTERACTIVE_MODE=""
+
+# Procesar argumentos
+# Si el primer argumento es -i, lo guardamos y desplazamos los argumentos restantes
+if [ "$1" == "-i" ]; then
+    INTERACTIVE_MODE="-i"
+    shift # Elimina -i de la lista de argumentos, dejando solo los archivos de chat
+fi
+
 # Verifica que se hayan proporcionado archivos de entrada
 if [ "$#" -eq 0 ]; then
-    echo "Uso: $0 <ruta_al_archivo_chat1.txt> [<ruta_al_archivo_chat2.txt> ...]"
+    echo "Uso: $0 [-i] <ruta_al_archivo_chat1.txt> [<ruta_al_archivo_chat2.txt> ...]"
     exit 1
 fi
 
@@ -39,16 +49,16 @@ for chat_file in "$@"; do
     dashboard_html="$OUTPUT_DIR/${base_name}_dashboard.html"
 
     # 1. Preprocesamiento
-    echo "  ➡️ Paso 1: Preprocesando '$chat_file' a '$preprocessed_csv'..."
+    echo "  ➡️ Paso 1: Preprocesando '$chat_file' a '$preprocessed_csv'..."
     python3 prepocessing.py "$chat_file" "$preprocessed_csv"
     if [ $? -ne 0 ]; then
         echo "❌ Error en el preprocesamiento de '$chat_file'. Saltando al siguiente archivo."
         continue
     fi
-    echo "  ✅ Preprocesamiento completado."
+    echo "  ✅ Preprocesamiento completado."
 
     # 2. Analisis
-    echo "  ➡️ Paso 2: Analizando datos de '$preprocessed_csv'..."
+    echo "  ➡️ Paso 2: Analizando datos de '$preprocessed_csv'..."
     python3 analisis.py "$preprocessed_csv" \
         --out_usuarios "$stats_usuarios_csv" \
         --out_mensual "$mensajes_mensual_csv" \
@@ -60,10 +70,10 @@ for chat_file in "$@"; do
         echo "❌ Error en el analisis de '$preprocessed_csv'. Saltando al siguiente archivo."
         continue
     fi
-    echo "  ✅ Analisis completado."
+    echo "  ✅ Analisis completado."
 
     # 3. Generación de graficas
-    echo "  ➡️ Paso 3: Generando dashboard en '$dashboard_html'..."
+    echo "  ➡️ Paso 3: Generando dashboard en '$dashboard_html'..."
     python3 graficas.py \
         --usuarios "$stats_usuarios_csv" \
         --mensual "$mensajes_mensual_csv" \
@@ -71,17 +81,18 @@ for chat_file in "$@"; do
         --menciones_globales "$menciones_globales_csv" \
         --dia_semana "$mensajes_por_dia_semana_csv" \
         --menciones_por_autor "$menciones_por_autor_csv" \
-        --salida "$dashboard_html"
+        --salida "$dashboard_html" \
+        $INTERACTIVE_MODE # Aquí se añade el argumento -i si se proporcionó al script
     if [ $? -ne 0 ]; then
         echo "❌ Error al generar el dashboard para '$base_name'. Saltando al siguiente archivo."
         continue
     fi
-    echo "  ✅ Dashboard generado."
+    echo "  ✅ Dashboard generado."
 
     # 4. Limpieza: Eliminar archivos CSV intermedios
-    echo "  🧹 Eliminando archivos intermedios..."
+    echo "  🧹 Eliminando archivos intermedios..."
     rm -f "$preprocessed_csv" "$stats_usuarios_csv" "$mensajes_mensual_csv" "$mensajes_por_hora_csv" "$menciones_globales_csv" "$mensajes_por_dia_semana_csv" "$menciones_por_autor_csv"
-    echo "  ✅ Archivos intermedios eliminados."
+    echo "  ✅ Archivos intermedios eliminados."
     echo "----------------------------------------------------"
 done
 
