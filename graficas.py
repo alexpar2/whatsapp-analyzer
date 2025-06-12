@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import argparse
 import ast # Para convertir la string de lista de palabras a lista
 import re # Importar la librería de expresiones regulares
+import calendar
 
 def cargar_datos(usuarios_csv, mensual_csv, horas_csv, menciones_globales_csv, dia_semana_csv, menciones_por_autor_csv):
     """
@@ -47,6 +48,27 @@ def grafica_pie_mensajes(df):
     fig = px.pie(df, names="nombre", values="num_mensajes", title="📊 Porcentaje de mensajes por usuario")
     return fig
 
+def grafica_linea_mensajes_por_mes_agregado(df):
+    """
+    Genera un gráfico de líneas del total de mensajes por mes (suma de todos los usuarios).
+    """
+    # Agrupar por fecha sumando los mensajes de todos los usuarios
+    df_agg = df.groupby('fecha', as_index=False).agg(num_mensajes=('num_mensajes', 'sum'))
+    
+    # Gráfico con una sola línea (sin distinción por usuario)
+    fig = px.line(
+        df_agg,
+        x="fecha",
+        y="num_mensajes",
+        markers=True,
+        title="📈 Total de mensajes por mes (todos los usuarios)",
+        labels={
+            "fecha": "Mes",
+            "num_mensajes": "Número de mensajes (total)"
+        }
+    )
+    return fig
+
 def grafica_barras(df, columna, titulo, eje_x, eje_y):
     """
     Genera un gráfico de barras horizontal, ordenado de mayor a menor.
@@ -69,28 +91,7 @@ def grafica_barras(df, columna, titulo, eje_x, eje_y):
     )
     return fig
 
-def grafica_linea_mensajes_por_mes(df):
-    """
-    Genera un gráfico de líneas de mensajes por mes por usuario.
-    """
-    fig = px.line(df, x="fecha", y="num_mensajes", color="usuario", markers=True,
-                  title="📈 Mensajes por mes por usuario")
-    return fig
 
-def grafica_linea_mensajes_por_hora(df):
-    """
-    Genera un gráfico de líneas de mensajes por hora del día por usuario.
-    """
-    fig = px.line(df, x="hora", y="num_mensajes", color="usuario", markers=True,
-                  title="⏰ Mensajes por hora del día por usuario",
-                  labels={"hora": "Hora del día (0-23)", "num_mensajes": "Número de mensajes"})
-    # Asegura que todas las horas de 0 a 23 estén en el eje X.
-    fig.update_xaxes(
-        tickmode='array',
-        tickvals=list(range(24)),
-        title_text="Hora del día (0-23)"
-    )
-    return fig
 
 def grafica_longitud_promedio(df):
     """
@@ -203,6 +204,220 @@ def grafica_mensajes_por_dia_semana(df):
     # Asegurarse de que los días estén ordenados en el eje X
     fig.update_xaxes(categoryorder='array', categoryarray=["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"])
     return fig
+
+def grafica_linea_mensajes_por_mes(df):
+    """
+    Genera un gráfico de líneas de mensajes por mes por usuario.
+    """
+    fig = px.line(df, x="fecha", y="num_mensajes", color="usuario", markers=True,
+                  title="📈 Mensajes por mes por usuario")
+    return fig
+
+def grafica_linea_mensajes_por_hora(df):
+    """
+    Genera un gráfico de líneas de mensajes por hora del día por usuario.
+    """
+    fig = px.line(df, x="hora", y="num_mensajes", color="usuario", markers=True,
+                  title="⏰ Mensajes por hora del día por usuario",
+                  labels={"hora": "Hora del día (0-23)", "num_mensajes": "Número de mensajes"})
+    # Asegura que todas las horas de 0 a 23 estén en el eje X.
+    fig.update_xaxes(
+        tickmode='array',
+        tickvals=list(range(24)),
+        title_text="Hora del día (0-23)"
+    )
+    return fig
+
+
+def grafica_linea_mensajes_por_hora_normalizado(df_hora, df_usuario):
+    """
+    Genera un gráfico de líneas de mensajes por hora del día,
+    normalizado por el total de mensajes de cada usuario.
+    """
+    # 1. Renombrar la columna de totales
+    df_tot = df_usuario.rename(columns={'num_mensajes': 'total_mensajes'})
+
+    # 2. Merge
+    df = df_hora.merge(
+        df_tot[['nombre', 'total_mensajes']],
+        left_on='usuario',
+        right_on='nombre',
+        how='left'
+    )
+
+    # 3. Calcular ratio
+    df['ratio'] = df['num_mensajes'] / df['total_mensajes']
+
+    # 4. Gráfico
+    fig = px.line(
+        df,
+        x="hora",
+        y="ratio",
+        color="usuario",
+        markers=True,
+        title="⏰ Proporción de mensajes por hora sobre el total por usuario",
+        labels={
+            "hora": "Hora del día (0-23)",
+            "ratio": "Mensajes / Total mensajes"
+        }
+    )
+    fig.update_xaxes(
+        tickmode='array',
+        tickvals=list(range(24)),
+        title_text="Hora del día (0-23)"
+    )
+    fig.update_yaxes(tickformat=".0%")  # opcional: muestra el ratio en %
+    return fig
+
+
+def grafica_mensajes_por_dia_semana_normalizado(df_dia, df_usuario):
+    """
+    Genera un gráfico de líneas de la actividad por día de la semana,
+    normalizado por el total de mensajes de cada usuario.
+    """
+    # 1. Renombrar la columna de totales
+    df_tot = df_usuario.rename(columns={'num_mensajes': 'total_mensajes'})
+    
+    # 2. Merge con df_dia (tiene columnas dia_semana, usuario, num_mensajes)
+    df = df_dia.merge(
+        df_tot[['nombre', 'total_mensajes']],
+        left_on='usuario',
+        right_on='nombre',
+        how='left'
+    )
+    
+    # 3. Calcular ratio
+    df['ratio'] = df['num_mensajes'] / df['total_mensajes']
+    
+    # 4. Gráfico
+    fig = px.line(
+        df,
+        x="dia_semana",
+        y="ratio",
+        color="usuario",
+        markers=True,
+        title="🗓️ Proporción de mensajes por día de la semana por usuario",
+        labels={
+            "dia_semana": "Día de la semana",
+            "ratio": "Mensajes / Total mensajes"
+        }
+    )
+    # Ordenar los días de la semana
+    fig.update_xaxes(
+        categoryorder='array',
+        categoryarray=["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    )
+    # Mostrar porcentajes
+    fig.update_yaxes(tickformat=".0%")
+    return fig
+
+
+def grafica_linea_mensajes_por_mes_normalizado(df_mes, df_usuario):
+    """
+    Genera un gráfico de líneas de mensajes por mes,
+    normalizado por el total de mensajes de cada usuario.
+    
+    df_mes debe tener al menos las columnas:
+      - fecha (tipo datetime o string representando el mes)
+      - usuario
+      - num_mensajes
+    """
+    # 1. Renombrar la columna de totales
+    df_tot = df_usuario.rename(columns={'num_mensajes': 'total_mensajes'})
+    
+    # 2. Merge con df_mes
+    df = df_mes.merge(
+        df_tot[['nombre', 'total_mensajes']],
+        left_on='usuario',
+        right_on='nombre',
+        how='left'
+    )
+    
+    # 3. Calcular ratio
+    df['ratio'] = df['num_mensajes'] / df['total_mensajes']
+    
+    # 4. Gráfico
+    fig = px.line(
+        df,
+        x="fecha",
+        y="ratio",
+        color="usuario",
+        markers=True,
+        title="📈 Proporción de mensajes por mes por usuario",
+        labels={
+            "fecha": "Mes",
+            "ratio": "Mensajes / Total mensajes"
+        }
+    )
+    # Opcional: formatear el eje Y como porcentaje
+    fig.update_yaxes(tickformat=".0%")
+    return fig
+
+
+def grafica_linea_mensajes_por_mes_del_anyo_normalizado(df_mes, df_usuario):
+    """
+    Genera un gráfico de líneas de mensajes por mes del año (enero–diciembre),
+    normalizado por el total de mensajes de cada usuario.
+    
+    Parámetros:
+    - df_mes: DataFrame con al menos las columnas:
+        * fecha: datetime (o string convertible) con fechas de los mensajes.
+        * usuario: nombre del usuario.
+        * num_mensajes: número de mensajes en esa fecha.
+    - df_usuario: DataFrame con al menos las columnas:
+        * nombre: nombre del usuario.
+        * num_mensajes: total de mensajes del usuario.
+    """
+    # 1. Asegurar que 'fecha' es datetime y extraer mes numérico
+    df = df_mes.copy()
+    df['fecha'] = pd.to_datetime(df['fecha'])
+    df['mes'] = df['fecha'].dt.month
+    
+    # 2. Sumar los mensajes por usuario y mes
+    df_agg = (
+        df
+        .groupby(['usuario', 'mes'], as_index=False)
+        .agg(num_mensajes_mes=('num_mensajes', 'sum'))
+    )
+    
+    # 3. Renombrar totales y merge
+    df_tot = df_usuario.rename(columns={'num_mensajes': 'total_mensajes'})
+    df_merged = df_agg.merge(
+        df_tot[['nombre', 'total_mensajes']],
+        left_on='usuario',
+        right_on='nombre',
+        how='left'
+    )
+    
+    # 4. Calcular ratio
+    df_merged['ratio'] = df_merged['num_mensajes_mes'] / df_merged['total_mensajes']
+    
+    # 5. Traducir mes numérico a nombre (opcional)
+    df_merged['mes_nombre'] = df_merged['mes'].apply(lambda m: calendar.month_name[m].capitalize())
+    
+    # 6. Orden de meses
+    orden = [calendar.month_name[i].capitalize() for i in range(1, 13)]
+    
+    # 7. Gráfico
+    fig = px.line(
+        df_merged,
+        x="mes_nombre",
+        y="ratio",
+        color="usuario",
+        markers=True,
+        title="📊 Proporción de mensajes por mes del año por usuario",
+        labels={
+            "mes_nombre": "Mes",
+            "ratio": "Mensajes / Total mensajes"
+        }
+    )
+    fig.update_xaxes(categoryorder='array', categoryarray=orden)
+    fig.update_yaxes(tickformat=".0%")
+    return fig
+
+
+
+
 
 
 
@@ -457,9 +672,14 @@ def main():
         grafica_multimedia_por_mensaje(usuarios_df), # Se ha modificado para ordenar y ser horizontal
         grafica_preguntas_por_mensaje(usuarios_df), # Se ha modificado para ordenar y ser horizontal
 
+        grafica_linea_mensajes_por_mes_agregado(mensual_df),
         grafica_linea_mensajes_por_mes(mensual_df),
-        grafica_linea_mensajes_por_hora(horas_df), 
-        grafica_mensajes_por_dia_semana(dia_semana_df), # Ahora es un gráfico de líneas
+        grafica_linea_mensajes_por_mes_normalizado(mensual_df, usuarios_df),
+        grafica_linea_mensajes_por_mes_del_anyo_normalizado(mensual_df, usuarios_df), # Gráfico de líneas por mes del año, normalizado
+        grafica_mensajes_por_dia_semana(dia_semana_df),
+        grafica_mensajes_por_dia_semana_normalizado(dia_semana_df, usuarios_df), 
+        grafica_linea_mensajes_por_hora(horas_df),
+        grafica_linea_mensajes_por_hora_normalizado(horas_df, usuarios_df),
         grafica_top_hablante_mes(mensual_df), # Este no se ordena por los valores y es un gráfico de barras
         grafica_heatmap_menciones(menciones_por_autor_df, usuarios_df) # Heatmap, no aplica ordenación de la misma manera
     ]

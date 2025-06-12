@@ -2,7 +2,8 @@ import re
 import csv
 from dateutil import parser as date_parser
 import argparse
-from datetime import datetime # Asegurarse de que datetime esté importado para isoformat si no lo está
+from datetime import datetime
+import os
 
 # Este patrón es clave. Si tus chats tienen un formato ligeramente diferente,
 # no se detectará ningún mensaje. Ejemplo: "DD/MM/AAAA, HH:MM - Nombre: Mensaje"
@@ -19,17 +20,9 @@ SISTEMA_PATRONES = [
     re.compile(r"^‎?.*cambió la foto del grupo"),
 ]
 
-# Patrón para identificar el autor "Meta AI". Asegúrate de que el nombre sea exacto.
 META_AI_PATRON = re.compile(r"^Meta AI$")
-
-# Identifica autores que son números de teléfono (contactos no guardados).
-# Busca una cadena que empieza con '+' seguido de dígitos y espacios.
 CONTACTO_NO_AÑADIDO_PATRON = re.compile(r"^\+\d[\d\s]+")
 
-# --- NUEVO: Mapeo de nicknames a nombres reales ---
-# Define aquí tus nicknames y los nombres a los que quieres mapearlos.
-# Las claves son los nicknames tal como aparecen en el chat.
-# Los valores son los nombres estandarizados que quieres usar para el análisis.
 NICKNAME_MAPPING = {
     "Galletita Ginger": "Pablo",
     "Davidinchi": "David",
@@ -45,81 +38,71 @@ NICKNAME_MAPPING = {
     "Jose G": "Jose",
     "~𝙷𝚎𝚕𝚎𝚗 ❀": "Helen"
 }
-# --------------------------------------------------
 
 def es_mensaje_de_sistema(texto):
-    texto = texto.replace('‎', '')  # Elimina caracteres invisibles
-    for patron in SISTEMA_PATRONES:
-        if patron.match(texto):
-            return True
-    return False
+    texto = texto.replace('‎', '')
+    return any(patron.match(texto) for patron in SISTEMA_PATRONES)
 
 def es_mensaje_de_meta_ai(autor):
-    # Limpia el nombre del autor antes de comparar, por si hay espacios extra
     return bool(META_AI_PATRON.match(autor.strip()))
 
 def es_contacto_no_añadido(autor):
-    """Comprueba si el autor parece ser un número de teléfono (contacto no guardado)."""
     return bool(CONTACTO_NO_AÑADIDO_PATRON.match(autor.strip()))
 
 def normalizar_fecha(date_str, time_str):
     try:
-        # Esto debería manejar varios formatos de fecha (ej. DD/MM/YY, DD/MM/YYYY)
-        # y hora (ej. HH:MM, HH.MM) de forma robusta.
         dt = date_parser.parse(f"{date_str} {time_str}", dayfirst=True)
         return dt.isoformat()
-    except Exception as e:
-        # print(f"Error normalizando fecha/hora '{date_str} {time_str}': {e}") # Para depuración
+    except Exception:
         return None
+
+def limpiar_csv_de_nuls(input_path):
+    """
+    Elimina caracteres NUL (\x00) del archivo CSV sobrescribiendo el original.
+    """
+    temp_path = input_path + ".tmp"
+    with open(input_path, "r", encoding="utf-8", errors="replace") as fin, \
+         open(temp_path, "w", encoding="utf-8", newline='') as fout:
+        for line in fin:
+            fout.write(line.replace('\x00', ''))
+    os.replace(temp_path, input_path)
+    print(f"🧹 Limpieza de caracteres NUL completada: {input_path}")
 
 def preprocesar_chat(input_path, output_path):
     mensajes = []
-    line_num = 0 # No se usa en el código actual, pero se mantuvo de tu versión
+    line_num = 0
     with open(input_path, "r", encoding="utf-8") as f:
         for line in f:
             line_num += 1
-            # original_line = line.strip() # No se usa en el código actual, pero se mantuvo de tu versión
-            line = line.strip().replace('‎', '') # Limpieza invisible de WhatsApp
+            line = line.strip().replace('‎', '').replace('\x00', '')
 
             match = INPUT_PATTERN.match(line)
             if match:
                 fecha, hora, autor, texto = match.groups()
+                autor = autor.strip()
 
-                autor = autor.strip() # Limpiar espacios extra del autor
-
-                # --- FILTROS DE MENSAJES DE SISTEMA/BOT/NÚMEROS ---
-                # Filtrar mensajes de contactos no añadidos (números de teléfono)
-                if es_contacto_no_añadido(autor):
-                    continue # Ignora esta línea y pasa a la siguiente
-
-                # Filtrar mensajes de Meta AI
-                if es_mensaje_de_meta_ai(autor):
+                if es_contacto_no_añadido(autor) or es_mensaje_de_meta_ai(autor) or es_mensaje_de_sistema(texto):
                     continue
 
-                # Filtrar mensajes del sistema
-                if es_mensaje_de_sistema(texto):
-                    continue
-                # --------------------------------------------------
-                
-                # --- APLICAR MAPEO DE NICKNAMES (¡después de los filtros!) ---
                 if autor in NICKNAME_MAPPING:
                     autor = NICKNAME_MAPPING[autor]
-                # ------------------------------------------------------------
 
                 fecha_normalizada = normalizar_fecha(fecha, hora)
                 if fecha_normalizada:
-                    mensajes.append([fecha_normalizada, autor, texto.strip()]) # Usar el 'autor' ya mapeado
+                    mensaje_limpio = texto.strip().replace('\x00', '')
+                    mensajes.append([fecha_normalizada, autor, mensaje_limpio])
             elif mensajes:
-                # Si no coincide el patrón pero ya hay mensajes, es una continuación de línea
-                # Asegúrate de limpiar también la línea de continuación
-                mensajes[-1][2] += "\n" + line
+                mensajes[-1][2] += "\n" + line.replace('\x00', '')
 
     with open(output_path, "w", encoding="utf-8", newline='') as f_out:
-        writer = csv.writer(f_out, quoting=csv.QUOTE_MINIMAL)
-        writer.writerow(["fecha", "nombre", "mensaje"])  # Cabecera
+        writer = csv.writer(f_out, quoting=csv.QUOTE_MINIMAL, escapechar='\\')
+        writer.writerow(["fecha", "nombre", "mensaje"])
         writer.writerows(mensajes)
 
     print(f"☑️ {len(mensajes)} mensajes procesados. Guardado en: {output_path}")
+
+    # Limpieza final de caracteres NUL en el archivo generado
+    limpiar_csv_de_nuls(output_path)
 
 def main():
     parser = argparse.ArgumentParser(description="Preprocesador de chats de WhatsApp (salida en CSV).")

@@ -3,14 +3,11 @@ import argparse
 from collections import defaultdict, Counter
 from datetime import datetime
 import re
-import pandas as pd # Para el DataFrame de menciones
-
-# Importar las librerías necesarias para PLN
+import pandas as pd
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
-# --- DESCARGA DE RECURSOS NLTK (¡EJECUTAR UNA VEZ!) ---
 try:
     nltk.data.find('corpora/stopwords')
 except nltk.downloader.DownloadError:
@@ -22,11 +19,9 @@ except nltk.downloader.DownloadError:
     print("Descargando 'punkt' de NLTK...")
     nltk.download('punkt')
 
-# Definir stopwords en español y añadir palabras a excluir
 STOPWORDS_ES = set(stopwords.words('spanish'))
-# Ampliamos la lista de palabras a excluir para incluir palabras comunes que no sean sustantivos relevantes
 PALABRAS_A_EXCLUIR = {
-    "multimedia", "omitido", "https", "http", "www", "com", # Las ya existentes
+    "multimedia", "omitido", "https", "http", "www", "com", 
     "q", "k", "xd", "jajaja", "jejeje", "xD", "jaja", "jajajaja", # Risas y abreviaturas
     "si", "no", "gracias", "ok", "vale", "claro", "bueno", "hola", "adios", # Respuestas cortas
     "un", "una", "unos", "unas", "el", "la", "los", "las", # Artículos

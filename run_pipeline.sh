@@ -4,7 +4,7 @@
 # Uso: ./run_pipeline.sh <ruta_al_archivo_chat1.txt> [<ruta_al_archivo_chat2.txt> ...]
 
 # Directorio para almacenar los resultados (archivos HTML finales)
-OUTPUT_DIR="whatsapp_results"
+OUTPUT_DIR="whatsapp_results2"
 mkdir -p "$OUTPUT_DIR"
 
 # Verifica que se hayan proporcionado archivos de entrada
